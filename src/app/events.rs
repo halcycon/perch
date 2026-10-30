@@ -28,6 +28,26 @@ pub fn process_pending_update(state: &mut AppState) {
 }
 
 /// Handle key events, returning an optional async command
+/// Handle text pasted into the terminal (bracketed paste).
+///
+/// Without bracketed paste, terminals and multiplexers replay pasted text as
+/// key presses, and line breaks can arrive as escape sequences (for example
+/// `ESC E`) that end up in the compose text as stray characters.
+pub fn handle_paste(state: &mut AppState, text: &str) {
+    let text = text.replace("\r\n", "\n").replace('\r', "\n");
+    match state.mode {
+        Mode::Compose if state.compose_schedule_focused => {
+            state
+                .compose_schedule_input
+                .push_str(&text.replace('\n', " "));
+            let _ = state.apply_schedule_input();
+        }
+        Mode::Compose => state.compose_text.push_str(&text),
+        Mode::Search => state.search_query.push_str(&text.replace('\n', " ")),
+        _ => {}
+    }
+}
+
 pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
     // Handle mode-specific input first
     match state.mode {
